@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ชิ้นงานกรองไอออนทองแดง | ถ่านกัมมันต์กะลามะพร้าว + เยื่อกระดาษรีไซเคิล</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#e6e9e3;--ink:#1d2a26;--mute:#55655f;--acc:#1f7a6b;--glass:rgba(255,255,255,.72)}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;overflow:hidden;font-family:Prompt,"Noto Sans Thai",sans-serif;background:var(--bg);color:var(--ink)}
+body.dark{--ink:#eef3f1;--mute:#a9bbb5;--glass:rgba(20,30,30,.6)}
+#stage{position:fixed;inset:0;background:var(--bg);transition:background .5s}
+body.dark #stage{background:#0d1517}
+canvas{display:block;width:100%;height:100%;touch-action:none;outline:none}
+nav{position:fixed;top:14px;left:50%;transform:translateX(-50%);display:flex;gap:6px;padding:6px;background:var(--glass);backdrop-filter:blur(10px);border-radius:999px;z-index:5;max-width:96vw}
+nav button{font:500 14px Prompt,sans-serif;border:0;background:none;color:var(--ink);padding:9px 16px;border-radius:999px;cursor:pointer;white-space:nowrap}
+nav button.on{background:var(--acc);color:#fff}
+nav button:focus-visible,#fs:focus-visible{outline:3px solid #f2b705;outline-offset:2px}
+#cap{position:fixed;left:24px;bottom:24px;max-width:min(440px,calc(100vw - 100px));z-index:4;pointer-events:none}
+#cap h1{font-size:clamp(22px,3.4vw,34px);font-weight:600;line-height:1.25}
+#cap p{margin-top:6px;color:var(--mute);font-size:15px;line-height:1.6}
+#fs{position:fixed;right:20px;bottom:20px;width:46px;height:46px;border-radius:50%;border:0;background:var(--glass);backdrop-filter:blur(10px);color:var(--ink);cursor:pointer;z-index:5;display:grid;place-items:center}
+#hint{position:fixed;right:78px;bottom:32px;font-size:12.5px;color:var(--mute);z-index:4;pointer-events:none;text-align:right}
+.tag{position:fixed;left:0;top:0;z-index:3;pointer-events:none;width:200px;padding:10px 12px;background:var(--glass);backdrop-filter:blur(8px);border-radius:10px;border-left:3px solid var(--acc);display:none;font-size:13px;line-height:1.5}
+.tag b{display:block;font-weight:600;font-size:14px}
+.tag span{color:var(--mute)}
+.tag::after{content:"";position:absolute;left:50%;top:100%;width:2px;height:26px;background:var(--acc)}
+#load{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);z-index:9;transition:opacity .6s}
+@media(max-width:640px){nav button{padding:8px 11px;font-size:13px}#hint{display:none}.tag{width:150px;font-size:12px}}
+@media(prefers-reduced-motion:reduce){#stage,#load{transition:none}}
+</style>
+</head>
+<body class="dark">
+<div id="stage"></div>
+<div id="load">กำลังโหลดโมเดล 3 มิติ…</div>
+<nav aria-label="เปลี่ยนหน้า">
+<button class="on">1 ในท่อน้ำทิ้ง</button><button>2 ชิ้นงาน</button><button>3 แยกส่วน</button><button>4 การไหลของน้ำ</button>
+</nav>
+<div id="cap"><h1></h1><p></p></div>
+<div id="hint">ลากเพื่อหมุน · เลื่อน/จีบนิ้วเพื่อซูม</div>
+<button id="fs" aria-label="ขยายเต็มจอ"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+<div class="tag" id="t0"></div><div class="tag" id="t1"></div><div class="tag" id="t2"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const $=s=>document.querySelector(s), stage=$('#stage');
+const R=new THREE.WebGLRenderer({antialias:true});
+R.setPixelRatio(Math.min(devicePixelRatio,2));R.shadowMap.enabled=true;R.shadowMap.type=THREE.PCFSoftShadowMap;
+R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.15;
+stage.appendChild(R.domElement);
+const rnd=(a=0,b=1)=>a+Math.random()*(b-a);
+
+/* ---------- Realistic filter disc ---------- */
+function fibreTex(){
+  const c=document.createElement('canvas');c.width=c.height=512;const g=c.getContext('2d');
+  g.fillStyle='#b99a69';g.fillRect(0,0,512,512);
+  for(let i=0;i<9000;i++){g.fillStyle=`rgba(${rnd(90,230)|0},${rnd(70,190)|0},${rnd(40,130)|0},${rnd(.05,.25)})`;g.fillRect(rnd(0,512),rnd(0,512),rnd(1,4),rnd(1,4));}
+  for(let i=0;i<2600;i++){const x=rnd(0,512),y=rnd(0,512),a=rnd(0,6.28),l=rnd(8,40);
+    g.strokeStyle=Math.random()<.5?`rgba(235,220,190,${rnd(.25,.6)})`:`rgba(70,50,30,${rnd(.15,.4)})`;g.lineWidth=rnd(.6,1.8);
+    g.beginPath();g.moveTo(x,y);g.quadraticCurveTo(x+Math.cos(a+1)*l/2,y+Math.sin(a+1)*l/2,x+Math.cos(a)*l,y+Math.sin(a)*l);g.stroke();}
+  const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=8;return t;
+}
+const FT=fibreTex();
+const bodyMat=new THREE.MeshStandardMaterial({color:0xffffff,map:FT,bumpMap:FT,bumpScale:2.2,roughness:.95});
+const chunkGeo=new THREE.IcosahedronGeometry(1,0);
+const chunkMat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:.5,metalness:.15,flatShading:true});
+function chunks(n,place){
+  const m=new THREE.InstancedMesh(chunkGeo,chunkMat,n),o=new THREE.Object3D(),col=new THREE.Color();
+  for(let i=0;i<n;i++){
+    place(o.position);const s=rnd(.045,.1);
+    o.scale.set(s*rnd(.8,1.3),s*rnd(.5,1),s*rnd(.8,1.3));o.rotation.set(rnd(0,6.3),rnd(0,6.3),rnd(0,6.3));o.updateMatrix();m.setMatrixAt(i,o.matrix);
+    const v=rnd(.03,.16);col.setRGB(v,v*(Math.random()<.2?1.1:1),v*.95);m.setColorAt(i,col);
+  }
+  m.castShadow=m.receiveShadow=true;return m;
+}
+function makeDisc(withChunks=true,withBody=true){
+  const g=new THREE.Group();
+  if(withBody){const b=new THREE.Mesh(new THREE.CylinderGeometry(.97,.97,.34,72,1),bodyMat);b.castShadow=b.receiveShadow=true;g.add(b);}
+  if(withChunks){
+    g.add(chunks(780,p=>{const a=rnd(0,6.283),r=.97*Math.sqrt(rnd()),s=Math.random()<.5?1:-1;p.set(Math.cos(a)*r,s*(.165-rnd(0,.03)),Math.sin(a)*r);}));
+    g.add(chunks(170,p=>{const a=rnd(0,6.283);p.set(Math.cos(a)*.97,rnd(-.15,.15),Math.sin(a)*.97);}));
+  }
+  return g;
+}
+function cloud(){
+  return chunks(420,p=>{const a=rnd(0,6.283),r=1.15*Math.sqrt(rnd());p.set(Math.cos(a)*r,rnd(-.9,.9),Math.sin(a)*r);});
+}
+
+/* ---------- Flowing water shader + particles ---------- */
+function flowMat(axis,a,b,dirty,clean){
+  return new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,
+    uniforms:{uT:{value:0},uAx:{value:axis},uA:{value:a},uB:{value:b},uD:{value:new THREE.Color(dirty)},uC:{value:new THREE.Color(clean)},uS:{value:3}},
+    vertexShader:'varying vec3 w;varying vec2 u;void main(){w=(modelMatrix*vec4(position,1.)).xyz;u=uv;gl_Position=projectionMatrix*viewMatrix*vec4(w,1.);}',
+    fragmentShader:'uniform float uT,uA,uB,uS;uniform vec3 uAx,uD,uC;varying vec3 w;varying vec2 u;void main(){float t=dot(w,uAx);'+
+    'float s=sin(t*5.-uT*uS+sin(u.x*18.8+t*1.4)*1.6)*.5+.5;float s2=sin(t*12.-uT*uS*1.8+u.x*37.7)*.5+.5;'+
+    'vec3 c=mix(uD,uC,smoothstep(uA,uB,t));c+=vec3(.25)*pow(s*s2,3.);gl_FragColor=vec4(c,.10+.34*s*s2);}'});
+}
+function particles(n,axis,len,rad,t0,mid,dirty,clean,size){
+  const pos=new Float32Array(n*3),col=new Float32Array(n*3),T=new Float32Array(n),A=[],B=[];
+  for(let i=0;i<n;i++){T[i]=rnd(t0,t0+len);const a=rnd(0,6.283),r=rad*Math.sqrt(rnd());A.push(Math.cos(a)*r);B.push(Math.sin(a)*r);}
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(pos,3));geo.setAttribute('color',new THREE.BufferAttribute(col,3));
+  const P=new THREE.Points(geo,new THREE.PointsMaterial({size,vertexColors:true,transparent:true,opacity:.9,depthWrite:false}));
+  const cd=new THREE.Color(dirty),cc=new THREE.Color(clean);
+  P.userData.upd=(dt,sp)=>{for(let i=0;i<n;i++){T[i]+=dt*sp*(.8+.4*((i*7)%5)/5);if(T[i]>t0+len)T[i]-=len;const t=T[i];
+    if(axis==='x')pos.set([t,A[i],B[i]],i*3);else pos.set([A[i],-t,B[i]],i*3);
+    const c=t>mid?cc:cd;col.set([c.r,c.g,c.b],i*3);}
+    geo.attributes.position.needsUpdate=geo.attributes.color.needsUpdate=true;};
+  P.frustumCulled=false;return P;
+}
+
+/* ---------- Scenes ---------- */
+function lights(sc,k=1){
+  sc.add(new THREE.HemisphereLight(0xffffff,0x667770,.9*k));
+  const d=new THREE.DirectionalLight(0xfff2dd,2.2*k);d.position.set(4,7,5);d.castShadow=true;d.shadow.mapSize.set(1024,1024);
+  Object.assign(d.shadow.camera,{left:-6,right:6,top:6,bottom:-6,near:1,far:25});d.shadow.bias=-.0005;sc.add(d);
+  const f=new THREE.DirectionalLight(0xaad4ff,.8*k);f.position.set(-5,2,-4);sc.add(f);
+}
+const S=[];
+
+// 1) pipe
+(()=>{
+  const sc=new THREE.Scene();sc.fog=new THREE.Fog(0x0d1517,10,34);sc.background=new THREE.Color(0x0d1517);
+  sc.add(new THREE.HemisphereLight(0x9fc4d0,0x1a2224,.9));
+  const pl=new THREE.PointLight(0xfff0d0,60,24,1.6);pl.position.set(-4,1.8,0);sc.add(pl);
+  const pl2=new THREE.PointLight(0x7fd0ff,40,20,1.6);pl2.position.set(5,1.5,0);sc.add(pl2);
+  const pc=document.createElement('canvas');pc.width=pc.height=256;const g=pc.getContext('2d');g.fillStyle='#5b6360';g.fillRect(0,0,256,256);
+  for(let i=0;i<5000;i++){const v=rnd(60,140)|0;g.fillStyle=`rgba(${v},${v+4},${v},${rnd(.1,.4)})`;g.fillRect(rnd(0,256),rnd(0,256),rnd(1,3),rnd(1,3));}
+  const pt=new THREE.CanvasTexture(pc);pt.wrapS=pt.wrapT=THREE.RepeatWrapping;pt.repeat.set(10,3);
+  const pipe=new THREE.Mesh(new THREE.CylinderGeometry(3.1,3.1,40,64,1,true),new THREE.MeshStandardMaterial({map:pt,bumpMap:pt,bumpScale:3,roughness:.9,side:THREE.BackSide}));
+  pipe.rotation.z=Math.PI/2;sc.add(pipe);
+  for(let x=-18;x<=18;x+=4){const r=new THREE.Mesh(new THREE.TorusGeometry(3.08,.1,12,64),new THREE.MeshStandardMaterial({color:0x4b5350,roughness:.8}));r.rotation.y=Math.PI/2;r.position.x=x;sc.add(r);}
+  const st=new THREE.Group();st.scale.setScalar(2.55);
+  for(let i=0;i<4;i++){const d=makeDisc();d.position.y=(i-1.5)*.46;st.add(d);}
+  st.rotation.z=Math.PI/2;st.rotation.x=0;sc.add(st);
+  const fm=flowMat(new THREE.Vector3(1,0,0),-1.9,1.9,0x2a86ff,0xcdf3ff);fm.uniforms.uS.value=5;
+  const tube=new THREE.Mesh(new THREE.CylinderGeometry(2.95,2.95,40,64,1,true),fm);tube.rotation.z=Math.PI/2;sc.add(tube);
+  const p=particles(1600,'x',38,2.8,-19,0,0x3d9bff,0xe8fbff,.09);sc.add(p);
+  const light=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({visible:false}));sc.add(light);
+  S[0]={sc,cam:[-8.2,1.2,2.4],tgt:[0,0,0],rot:.35,dark:1,
+    cap:['ชิ้นงานติดตั้งในท่อน้ำทิ้ง','น้ำเสียที่มี Cu²⁺ (สีน้ำเงิน) ไหลผ่านชิ้นงาน แล้วออกมาเป็นน้ำที่ใสขึ้น'],
+    upd:(t,dt)=>{fm.uniforms.uT.value=t;p.userData.upd(dt,2.6);}};
+})();
+
+// 2) object only
+(()=>{
+  const sc=new THREE.Scene();lights(sc);
+  const gr=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.ShadowMaterial({opacity:.28}));gr.rotation.x=-Math.PI/2;gr.receiveShadow=true;sc.add(gr);
+  const G=new THREE.Group();
+  for(let i=0;i<3;i++){const d=makeDisc();d.position.set(rnd(-.04,.04),.17+i*.345,rnd(-.04,.04));d.rotation.y=rnd(0,6);G.add(d);}
+  const l=makeDisc();l.rotation.z=-1.2;l.rotation.y=.4;l.position.set(1.62,.97,.35);G.add(l);
+  G.position.x=-.6;sc.add(G);
+  S[1]={sc,cam:[3.6,2.6,4.6],tgt:[.1,.45,0],rot:.6,dark:0,
+    cap:['ชิ้นงานกรองไอออนทองแดง','ถ่านกัมมันต์กะลามะพร้าว + เยื่อกระดาษรีไซเคิล ขึ้นรูปเป็นก้อนชิ้นเดียว'],
+    upd:()=>{}};
+})();
+
+// 3) exploded explanation
+(()=>{
+  const sc=new THREE.Scene();lights(sc);
+  const gr=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.ShadowMaterial({opacity:.22}));gr.rotation.x=-Math.PI/2;gr.position.y=-1.3;gr.receiveShadow=true;sc.add(gr);
+  const a=cloud();a.position.set(-3.6,0,0);sc.add(a);
+  const b=makeDisc(false,true);b.position.set(0,0,0);b.rotation.x=.55;sc.add(b);
+  const c=makeDisc();c.position.set(3.6,0,0);c.rotation.x=.55;sc.add(c);
+  S[2]={sc,cam:[0,2.2,9.5],tgt:[0,0,0],rot:0,dark:0,
+    cap:['แยกส่วนองค์ประกอบ','ชิ้นงานสำเร็จเกิดจากวัสดุเหลือใช้สองอย่างมารวมกัน'],
+    tags:[[a,-3.6,'ถ่านกัมมันต์กะลามะพร้าว','ตัวดูดซับไอออน Cu²⁺ มีรูพรุนมาก จึงมีพื้นที่ผิวสำหรับดูดซับสูง'],
+          [b,0,'เยื่อกระดาษรีไซเคิล','ตัวประสานชีวภาพ ยึดเม็ดถ่านให้เป็นก้อน และเปิดทางให้น้ำไหลผ่าน'],
+          [c,3.6,'ชิ้นงานสำเร็จรูป','ขึ้นรูปเป็นก้อนเดียว วางซ้อนในท่อเพื่อกรองน้ำได้']],
+    upd:(t)=>{a.rotation.y=t*.3;a.rotation.x=t*.1;b.rotation.y=t*.25;c.rotation.y=t*.25;}};
+})();
+
+// 4) water test
+(()=>{
+  const sc=new THREE.Scene();lights(sc);
+  const glass=new THREE.MeshPhysicalMaterial({color:0xffffff,transparent:true,opacity:.13,roughness:.05,metalness:0,side:THREE.DoubleSide,depthWrite:false});
+  const tube=new THREE.Mesh(new THREE.CylinderGeometry(1.15,1.15,7.6,64,1,true),glass);tube.position.y=.4;sc.add(tube);
+  const beaker=new THREE.Mesh(new THREE.CylinderGeometry(1.9,1.7,2,64,1,true),glass);beaker.position.y=-4.2;sc.add(beaker);
+  const bw=new THREE.Mesh(new THREE.CylinderGeometry(1.66,1.58,1,48),new THREE.MeshPhysicalMaterial({color:0x9fdcff,transparent:true,opacity:.55,roughness:.05}));sc.add(bw);
+  const base=new THREE.Mesh(new THREE.CylinderGeometry(1.7,1.7,.08,48),new THREE.MeshStandardMaterial({color:0xcfd6d2,roughness:.4}));base.position.y=-5.2;sc.add(base);
+  const G=new THREE.Group();const D=[];
+  for(let i=0;i<5;i++){const d=makeDisc();d.scale.setScalar(.95);G.add(d);D.push(d);}sc.add(G);
+  const fm=flowMat(new THREE.Vector3(0,-1,0),-1.6,1.6,0x2a86ff,0xdff6ff);fm.uniforms.uS.value=6;
+  const flow=new THREE.Mesh(new THREE.CylinderGeometry(.86,.86,8.6,48,1,true),fm);flow.position.y=.1;sc.add(flow);
+  const p=particles(900,'y',8,.85,-4,0,0x2a86ff,0xcdeeff,.075);sc.add(p);
+  let ex=0,exT=0;
+  S[3]={sc,cam:[4.6,.6,8],tgt:[0,-.9,0],rot:0,dark:0,
+    cap:['ทดสอบการไหลของน้ำ','น้ำที่มี Cu²⁺ ไหลผ่านชิ้นงานลงสู่บีกเกอร์ · คลิกที่ชิ้นงานเพื่อแยกชั้น/รวมชั้น'],
+    pick:G,toggle:()=>{exT=exT?0:1;},
+    upd:(t,dt)=>{fm.uniforms.uT.value=t;p.userData.upd(dt,2.2);ex+=(exT-ex)*Math.min(1,dt*4);
+      const sp=.4+ex*1.0;D.forEach((d,i)=>{d.position.y=(2-i)*sp;});
+      const h=.25+.9*((t*.12)%1);bw.scale.y=h;bw.position.y=-5.14+h/2;
+      fm.uniforms.uA.value=-2*sp-.5;fm.uniforms.uB.value=2*sp+.5;}};
+})();
+
+/* ---------- Controls, pages, UI ---------- */
+const cam=new THREE.PerspectiveCamera(42,1,.1,100);
+const ctl=new THREE.OrbitControls(cam,R.domElement);ctl.enableDamping=true;ctl.dampingFactor=.07;ctl.minDistance=2;ctl.maxDistance=28;
+let cur=-1;const tags=[0,1,2].map(i=>$('#t'+i));
+const btns=[...document.querySelectorAll('nav button')];
+function go(i){
+  cur=i;const s=S[i];cam.position.set(...s.cam);ctl.target.set(...s.tgt);ctl.autoRotate=!!s.rot;ctl.autoRotateSpeed=s.rot;ctl.update();
+  btns.forEach((b,j)=>b.classList.toggle('on',j===i));
+  document.body.classList.toggle('dark',!!s.dark);R.setClearColor(s.dark?0x0d1517:0xe6e9e3,1);
+  $('#cap h1').textContent=s.cap[0];$('#cap p').textContent=s.cap[1];
+  tags.forEach((t,j)=>{const d=s.tags&&s.tags[j];t.style.display=d?'block':'none';if(d)t.innerHTML=`<b>${d[2]}</b><span>${d[3]}</span>`;});
+  history.replaceState(null,'','#'+(i+1));
+}
+btns.forEach((b,i)=>b.onclick=()=>go(i));
+$('#fs').onclick=()=>{const d=document,e=d.documentElement;(d.fullscreenElement||d.webkitFullscreenElement)?(d.exitFullscreen||d.webkitExitFullscreen).call(d):(e.requestFullscreen||e.webkitRequestFullscreen).call(e);};
+function size(){const w=innerWidth,h=innerHeight;R.setSize(w,h);cam.aspect=w/h;cam.updateProjectionMatrix();}
+addEventListener('resize',size);size();
+// click-to-explode on page 4
+let down=null;const ray=new THREE.Raycaster(),mv=new THREE.Vector2();
+R.domElement.addEventListener('pointerdown',e=>down=[e.clientX,e.clientY]);
+R.domElement.addEventListener('pointerup',e=>{if(!down||cur!==3)return;
+  if(Math.hypot(e.clientX-down[0],e.clientY-down[1])<5){mv.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1);ray.setFromCamera(mv,cam);
+    if(ray.intersectObject(S[3].pick,true).length)S[3].toggle();}down=null;});
+const v=new THREE.Vector3(),clock=new THREE.Clock();
+function loop(){
+  requestAnimationFrame(loop);const dt=Math.min(clock.getDelta(),.05),t=clock.elapsedTime;
+  const s=S[cur];s.upd(t,dt);ctl.update();
+  if(s.tags)s.tags.forEach((d,j)=>{v.set(d[1],1.5,0).project(cam);const el=tags[j];
+    el.style.transform=`translate(${(v.x*.5+.5)*innerWidth-el.offsetWidth/2}px,${(-v.y*.5+.5)*innerHeight-el.offsetHeight-30}px)`;});
+  R.render(s.sc,cam);
+}
+const h=parseInt(location.hash.slice(1))||1;go(Math.min(4,Math.max(1,h))-1);
+loop();setTimeout(()=>{$('#load').style.opacity=0;setTimeout(()=>$('#load').remove(),700)},300);
+</script>
+</body>
+</html>
